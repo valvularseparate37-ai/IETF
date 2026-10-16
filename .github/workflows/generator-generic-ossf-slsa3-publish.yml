@@ -1,0 +1,102 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+# This workflow lets you generate SLSA provenance file for your project.
+# The generation satisfies level 3 for the provenance requirements - see https://slsa.dev/spec/v0.1/requirements
+# The project is an initiative of the OpenSSF (openssf.org) and is developed at
+# https://github.com/slsa-framework/slsa-github-generator.
+# The provenance file can be verified using https://github.com/slsa-framework/slsa-verifier.
+# For more information about SLSA and how it improves the supply-chain, visit slsa.dev.
+
+name: SLSA generic generator
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      digests: ${{ steps.hash.outputs.digests }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ========================================================
+      #
+      # Step 1: Build your artifacts.
+      #
+      # ========================================================
+      - name: Build artifacts
+        run: |
+            # These are some amazing artifacts.
+            echo "artifact1" > artifact1
+            echo "artifact2" > artifact2
+
+      # ========================================================
+      #
+      # Step 2: Add a step to generate the provenance subjects
+      #         as shown below. Update the sha256 sum arguments
+      #         to include all binaries that you generate
+      #         provenance for.
+      #
+      # ========================================================
+      - name: Generate subject for provenance
+        id: hash
+        run: |
+          set -euo pipefail
+
+          # List the artifacts the provenance will refer to.
+          files=$(ls artifact*)
+          # Generate the subjects (base64 encoded).
+          echo "hashes=$(sha256sum $files | base64 -w0)" >> "${GITHUB_OUTPUT}"
+
+  provenance:
+    needs: [build]
+    permissions:
+      actions: read   # To read the workflow path.
+      id-token: write # To sign the provenance.
+      contents: write # To add assets to a release.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    with:
+      base64-subjects: "${{ needs.build.outputs.digests }}"
+      upload-assets: true # Optional: Upload to a new release
+
+How it fits together:
+- The repo is an evidence and draft repository, not an application. The draft XML is a canonical source that can be rendered to HTML/ASCII/ PDF via xml2rfc; CSVs supply datasets referenced in the analyses; text and PDFs document methodology, findings, and presentations. Use the XML draft as the authoritative draft source and the CSV/TXT files as supporting data for experiments or reproducibility.
+
+## How to use / view the contents
+Clone the repo and then open the files you need.
+
+Basic steps:
+```bash
+git clone https://github.com/ksriram25/IETF.git
+cd IETF
+ls -1
+# install xml2rfc (Python package)
+pip install xml2rfc
+
+# render HTML
+xml2rfc draft-ietf-sidrops-rpki-prefixlist-01.xml --html -o draft-rpki-prefixlist.html
+
+# or render plain text (for RFC editor preview)
+xml2rfc draft-ietf-sidrops-rpki-prefixlist-01.xml --text -o draft-rpki-prefixlist.txt
+# install xml2rfc (Python package)
+pip install xml2rfc
+
+# render HTML
+xml2rfc draft-ietf-sidrops-rpki-prefixlist-01.xml --html -o draft-rpki-prefixlist.html
+
+# or render plain text (for RFC editor preview)
+xml2rfc draft-ietf-sidrops-rpki-prefixlist-01.xml --text -o draft-rpki-prefixlist.txt
+import pandas as pd
+df = pd.read_csv("IPv4 Prefixes with AS0 ROA.csv")
+print(df.head())
+# find references to ASPA:
+grep -R "ASPA" -n .
+
+# quick lines from the AS_SET analysis
+sed -n '1,120p' Detailed-AS_SET-analysis.txt
